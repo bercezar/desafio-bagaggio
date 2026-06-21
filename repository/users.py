@@ -33,22 +33,11 @@ def create_user(db: Session, name: str, email: str, password: str) -> User:
 def update_user(
     db: Session,
     user: User,
-    *,
-    name: str | None = None,
-    email: str | None = None,
-    password: str | None = None,
-    is_active: bool | None = None,
+    update_data: dict
 ) -> User:
-    if name:
-        user.name = name.strip()
-    if email:
-        user.email = email
-    if password:
-        user.password = password
-    if is_active:
-        user.is_active = is_active
+    for key, value in update_data.items():
+        setattr(user, key, value)
 
-    user.updated_at = utc_now()
     db.commit()
     db.refresh(user)
     return user
