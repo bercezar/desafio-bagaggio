@@ -24,14 +24,14 @@ Para garantir escalabilidade e manutenção, a aplicação foi reestruturada bas
 
 ```mermaid
 graph TD
-    Client["🌐 Cliente (HTTP / JSON)"]
-    Route["⚡ Route (FastAPI Controller)"]
-    Schema["🛡️ Pydantic (Validação e Filtro)"]
-    Repo["🏗️ Repository (Acesso a Dados)"]
-    Entity["🗃️ Entity (Modelo ORM)"]
-    DB["💾 Banco de Dados (SQLite)"]
+    Client([Cliente HTTP JSON])
+    Route[Route: FastAPI Controller]
+    Schema[Schema: Pydantic]
+    Repo[Repository: Acesso a Dados]
+    Entity[Entity: Modelo ORM]
+    DB[(Banco de Dados SQLite)]
 
-    Client -->|1. Envia requisição JSON| Route
+    Client -->|1. Envia requisicao JSON| Route
     Route -->|2. Valida e filtra dados| Schema
     Schema -->|3. Repassa dados limpos| Repo
     Repo -->|4. Usa como molde de tabela| Entity
