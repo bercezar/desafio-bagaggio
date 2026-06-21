@@ -1,4 +1,4 @@
-# 🚀 Desafio Técnico - API de Usuários
+# 🚀 Desafio Técnico - API de Usuários - RESOLVIDO
 
 ## 📖 Contexto
 
@@ -88,11 +88,11 @@ http://localhost:8000/api/users/docs
 
 ## 📌 Endpoints Disponíveis
 
-* `POST /users/`
-* `GET /users/`
-* `GET /users/{user_id}`
-* `PATCH /users/{user_id}`
-* `DELETE /users/{user_id}`
+- `POST /users/`
+- `GET /users/`
+- `GET /users/{user_id}`
+- `PATCH /users/{user_id}`
+- `DELETE /users/{user_id}`
 
 ---
 
@@ -100,11 +100,12 @@ http://localhost:8000/api/users/docs
 
 Sua entrega deve conter:
 
-* Código atualizado;
-* Melhorias que você considerar relevantes;
-* Instruções para execução do projeto;
-* Explicação das alterações realizadas;
-* Justificativas para decisões importantes;
+- Código atualizado;
+- Melhorias que você considerar relevantes;
+- Instruções para execução do projeto;
+- Explicação das alterações realizadas;
+- Justificativas para decisões importantes;
+
 ---
 
 ## 📝 Importante
