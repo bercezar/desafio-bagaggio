@@ -1,7 +1,20 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
-# Http(Json) -> Route -> Pydantic -> Repository -> Entity -> Banco
+
+"""
+(HTTP/JSON)
+  ↓
+Route (FastAPI Controller)
+  ↓
+Pydantic (Validação de entrada)
+  ↓
+Repository (Lógica de persistência)
+  ↓
+ORM Entity (SQLAlchemy Model)
+  ↓
+Database
+"""
 
 
 class UserCreate(BaseModel):
