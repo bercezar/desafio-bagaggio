@@ -2,116 +2,150 @@
 
 > **Repositório Original do Desafio:** [Bagaggio-II / teste-estagio-2026](https://github.com/Bagaggio-II/teste-estagio-2026)
 
-> **DEV Bernardo Cezar:** [Linkedin](www.linkedin.com/in/bernardocezaralvesdeoliveira)
+> **Desenvolvido por Bernardo Cezar:** [LinkedIn](https://www.linkedin.com/in/bernardocezaralvesdeoliveira)
 
 ---
 
-## 🔍 Problemas Identificados
+# 📖 Sobre o Projeto
 
-Durante a análise da API, foram encontrados pontos críticos que impactavam segurança, consistência dos dados e organização do código:
+Este repositório contém minha solução para o desafio técnico proposto pela Bagaggio.
 
-- **Exposição de dados sensíveis:** As senhas estavam sendo retornadas nas respostas da API.
-- **Inconsistência na exclusão de registros:** O endpoint de `DELETE` apresentava comportamento incorreto, removendo registros diferentes do usuário solicitado devido a falhas na lógica do repositório.
-- **Duplicidade de e-mails:** Não havia validação adequada para unicidade de e-mail, permitindo o cadastro de múltiplos usuários com o mesmo endereço.
-- **Metadados não atualizados:** O campo `updated_at` não era atualizado corretamente nas operações de `PATCH`, não refletindo as alterações realizadas.
-- **Acoplamento e Falha de Comunicação:** Parte das regras de negócio e acesso a dados estavam distribuídas entre `routes` e `main`. Além disso, o `Repository` e a `Route` não conversavam de forma clara, gerando sobreposição e duplicidade de ações operacionais espalhadas entre a rota e a entidade.
+O objetivo não foi reescrever a aplicação do zero, mas assumir uma base de código existente, compreender sua estrutura, identificar oportunidades de melhoria e evoluí-la de forma incremental, preservando seu funcionamento enquanto aumentava sua segurança, organização e facilidade de manutenção.
 
 ---
 
-## 🛠️ Nova Arquitetura (Repository Pattern)
+# 🔍 Processo de Análise
 
-Para garantir escalabilidade e manutenção, a aplicação foi reestruturada baseada no princípio da **Separação de Responsabilidades (SoC)**. A camada de Rotas agora atua estritamente como controladora.
+Antes de realizar qualquer alteração, executei a aplicação e revisei sua estrutura para compreender o fluxo entre rotas, entidades e persistência dos dados.
+
+A partir dessa análise, identifiquei oportunidades de melhoria relacionadas à:
+
+* Segurança;
+* Consistência dos dados;
+* Organização da arquitetura;
+* Separação de responsabilidades;
+* Manutenibilidade do código.
+
+As alterações foram realizadas de forma incremental, preservando a estrutura original da aplicação sempre que possível, conforme proposto pelo desafio.
+
+---
+
+# 🔎 Problemas Identificados
+
+Durante a análise da API, foram encontrados pontos que impactavam segurança, consistência dos dados e manutenção da aplicação.
+
+* **Exposição de dados sensíveis:** As senhas eram retornadas nas respostas da API.
+* **Inconsistência na exclusão de registros:** O endpoint `DELETE` apresentava comportamento incorreto devido à lógica utilizada no repositório.
+* **Duplicidade de e-mails:** Não existia validação para impedir o cadastro de usuários utilizando o mesmo endereço de e-mail.
+* **Atualização incompleta de metadados:** O campo `updated_at` não era atualizado automaticamente nas operações de `PATCH`.
+* **Responsabilidades distribuídas:** Parte da lógica de persistência encontrava-se misturada às rotas, dificultando manutenção, reutilização de código e evolução da aplicação.
+
+---
+
+# 🛠️ Reorganização da Arquitetura
+
+A aplicação foi reorganizada seguindo o princípio da **Separação de Responsabilidades (Separation of Concerns - SoC)**.
+
+Com isso:
+
+* As **Rotas (Routes)** passaram a tratar exclusivamente das requisições e respostas HTTP;
+* Os **Schemas (Pydantic)** ficaram responsáveis pela validação dos dados de entrada e saída;
+* O **Repository** passou a centralizar todo o acesso ao banco de dados;
+* As **Entities (SQLAlchemy)** permaneceram representando as tabelas da aplicação.
 
 ```mermaid
 graph TD
-    Client([Cliente HTTP JSON])
-    Route[Route: FastAPI Controller]
-    Schema[Schema: Pydantic]
-    Repo[Repository: Acesso a Dados]
-    Entity[Entity: Modelo ORM]
-    DB[(Banco de Dados SQLite)]
+    Client([Cliente HTTP])
+    Route[Routes]
+    Schema[Schemas Pydantic]
+    Repo[Repository]
+    Entity[Entity SQLAlchemy]
+    DB[(SQLite)]
 
-    Client -->|1. Envia requisicao JSON| Route
-    Route -->|2. Valida e filtra dados| Schema
-    Schema -->|3. Repassa dados limpos| Repo
-    Repo -->|4. Usa como molde de tabela| Entity
-    Repo -->|5. Executa comando SQL| DB
+    Client --> Route
+    Route --> Schema
+    Route --> Repo
+    Repo --> Entity
+    Entity --> DB
 ```
 
 ---
 
-## 💻 Soluções Aplicadas e Exemplos de Código
+# 💻 Soluções Aplicadas
 
-Abaixo estão as correções implementadas para resolver os problemas mapeados, isolando as responsabilidades:
+A seguir estão as principais melhorias implementadas durante a evolução da aplicação.
 
-### 1. Filtro de Saída e Proteção de Dados (Pydantic)
+## 1. Proteção de Dados Sensíveis
 
-**Solução:** Implementação de `response_model` nos endpoints. O Pydantic atua como barreira, cortando a senha antes da geração do JSON de resposta HTTP.
+**Solução:** Implementação do `response_model` nos endpoints para que o Pydantic filtre automaticamente os campos retornados ao cliente, impedindo que a senha seja exposta.
 
 ```python
-# Route: O modelo UserResponse garante que a senha fique de fora da saída
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(user_id: int, db: Session = Depends(get_db)):
     user = users.get_user(db, user_id)
+
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não existe")
 
-    found_user = users.get_user(db=db, user_id=user_id)
-    return found_user
-    # ...
+    return user
 ```
 
-### 2. Correção da Exclusão de Registros
+---
 
-**Solução:** Lógica de exclusão reescrita para garantir o alvo correto, buscando a instância exata no banco de dados através da ID antes do comando de deleção.
+## 2. Correção da Exclusão de Registros
+
+**Solução:** A lógica de exclusão foi simplificada para remover exclusivamente a entidade previamente recuperada do banco de dados.
 
 ```python
-# Repository: Deleção determinística e isolada da rota
 def delete_user(db: Session, user: User):
     db.delete(user)
     db.commit()
 ```
 
-### 3. Trava de Unicidade de E-mail
+---
 
-**Solução:** Inclusão de uma etapa de verificação prévia no banco de dados. Cadastros ou atualizações com e-mails já existentes são barrados na camada de roteamento. Assim como Unique Constraint em `Entities`.
+## 3. Validação de Unicidade de E-mail
+
+**Solução:** Foi adicionada validação antes da criação do usuário e também uma restrição de unicidade na entidade.
 
 ```python
-# Route: Validação de negócio executada antes de acionar o repositório
 users_email = users.get_user_by_email(db, email=payload.email)
+
 if users_email:
-    raise HTTPException(status_code=400, detail="Email já existente")
+    raise HTTPException(
+        status_code=400,
+        detail="Email já existente"
+    )
 ```
 
 ```python
-email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+email: Mapped[str] = mapped_column(
+    String(255),
+    unique=True,
+    nullable=False,
+    index=True
+)
 ```
 
-### 4. Atualização Reativa de Metadados (`updated_at`)
+---
 
-**Solução:** A responsabilidade de atualizar a data foi repassada para o motor do banco de dados (SQLAlchemy), utilizando o gatilho `onupdate`.
+## 4. Atualização Automática do Campo `updated_at`
+
+**Solução:** A atualização do campo passou a ser gerenciada automaticamente pelo SQLAlchemy utilizando o parâmetro `onupdate`, eliminando a necessidade de atualizar manualmente a data.
 
 ```python
-# Entity: O parâmetro onupdate garante a automação temporal da coluna
-class User(Base):
-    __tablename__ = "users"
-    # ...
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+updated_at = Column(
+    DateTime,
+    default=datetime.utcnow,
+    onupdate=datetime.utcnow
+)
 ```
 
-### 5. Isolamento de Responsabilidades (Route vs Repository)
+---
 
-**Solução:** Eliminação da duplicidade de ações. `Route` passou a lidar exclusivamente com o protocolo HTTP, delegando a persistência de dados de forma genérica e dinâmica para o repositório via `setattr`.
+## 5. Separação de Responsabilidades
 
-```python
-# Repository: Atualização limpa de qualquer campo sem duplicar lógicas de 'if'
-def update_user(db: Session, user: User, update_data: dict) -> User:
-    for key, value in update_data.items():
-        setattr(user, key, value)
-    db.commit()
-    db.refresh(user)
-    return user
-```
+**Solução:** As rotas passaram a conter apenas validações relacionadas ao protocolo HTTP e regras de entrada da requisição. Toda a lógica de persistência foi concentrada na camada de repositório.
 
 ```python
 def update_user(
@@ -119,66 +153,101 @@ def update_user(
     user: User,
     update_data: dict
 ) -> User:
+
     for key, value in update_data.items():
         setattr(user, key, value)
 
     db.commit()
     db.refresh(user)
+
     return user
 ```
 
 ---
 
-## 🧹 Faxina de Código Legado (Clean Code)
+# 🧹 Refatoração e Limpeza do Código
 
-- **Limpeza do `main.py`:** Remoção de código morto, rotas de debug (`/debug/users-count`) e da função `buscar_usuario_na_main` que causava vazamento de conexões abertas no banco.
-- **Substituição de Helpers:** A função legada de `erro()` foi removida, padronizando os retornos da API com o `HTTPException` oficial do framework.
-- **Otimização de Imports:** Remoção de importações desnecessárias em arquivos centrais.
+Além das correções funcionais, também foram realizadas melhorias visando facilitar futuras manutenções.
 
----
-
-## 🔮 Roadmap de Evolução e Segurança
-
-1. **Soft Delete (Exclusão Lógica):** Alterar o `db.delete()` para uma atualização de status (`is_active = False`), retendo os dados para consultas de auditoria corporativa.
-2. **Hash de Senhas:** Implementar a biblioteca `passlib` (Bcrypt) para garantir que as senhas fiquem irreconhecíveis na base de dados, prevenindo exposição em caso de vazamento.
-3. **Testes Automatizados:** Criação de rotinas com `pytest` e `TestClient` para garantir a integridade técnica dos endpoints a cada nova atualização.
+* Remoção de código morto presente no `main.py`;
+* Remoção da rota de depuração `/debug/users-count`;
+* Remoção da função `buscar_usuario_na_main`, centralizando o acesso aos dados no repositório;
+* Substituição da função legada `erro()` pelo tratamento padrão utilizando `HTTPException`;
+* Organização e limpeza dos imports.
 
 ---
 
-## 🚀 Como Executar Localmente
+# 🔮 Possíveis Evoluções
 
-**1. Clonar o repositório:**
+Algumas melhorias foram identificadas, porém ficaram fora do escopo deste desafio.
+
+1. Implementação de **Soft Delete**, preservando o histórico dos registros.
+2. Armazenamento de senhas utilizando **Hash (Passlib + Bcrypt)**.
+3. Criação de testes automatizados com **Pytest** e **FastAPI TestClient**.
+4. Implementação de paginação na listagem de usuários.
+5. Tratamento centralizado de exceções.
+6. Logging estruturado para auditoria e monitoramento.
+
+---
+
+# 🚀 Como Executar Localmente
+
+## 1. Clonar o repositório
 
 ```bash
-git clone https://github.com/Bagaggio-II/teste-estagio-2026.git
+git clone https://github.com/USER/teste-estagio-2026.git
+
 cd teste-estagio-2026
 ```
 
-**2. Criar e ativar o ambiente virtual:**
+> **Substitua `SEU-USUARIO` pelo nome do seu repositório no GitHub.**
+
+---
+
+## 2. Criar e ativar o ambiente virtual
 
 ```bash
 python -m venv .venv
 
-# No Windows (PowerShell)
+# Windows (PowerShell)
 .\.venv\Scripts\Activate.ps1
 
-# No Linux ou macOS
+# Linux / macOS
 source .venv/bin/activate
 ```
 
-**3. Instalar as dependências:**
+---
+
+## 3. Instalar as dependências
 
 ```bash
 pip install -r requirements.txt
 ```
 
-**4. Iniciar o banco e o servidor:**
+---
+
+## 4. Inicializar o banco de dados
 
 ```bash
-# Caso possua dados iniciais:
-python seed.py
+python database/seed.py
+```
 
+---
+
+## 5. Executar a API
+
+```bash
 uvicorn main:app --reload
 ```
 
-Acesse a documentação interativa (Swagger UI) em: `http://127.0.0.1:8000/api/users/docs`.
+---
+
+## 📄 Documentação
+
+Após iniciar a aplicação, a documentação interativa (Swagger UI) estará disponível em:
+
+```text
+http://127.0.0.1:8000/api/users/docs
+```
+
+---
